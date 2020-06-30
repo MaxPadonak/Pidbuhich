@@ -174,18 +174,7 @@ void oled_naliv(int MenuFlag, int Drink, int DrinkCount) {
     lcd.print(DrinkCount);
   Serial.println(DrinkCount); 
     lcd.setCursor(7, 1);
-    lcd.print(F("РЮМ"));
-
-  if (DrinkCount == 1) {
-    lcd.setCursor(10, 1);
-    lcd.print(F("КУ     "));
-  } else if (DrinkCount <= 4 ) {
-    lcd.setCursor(10, 1);
-    lcd.print(F("КИ     "));
-  } else {
-    lcd.setCursor(10, 1);
-    lcd.print(F("ОК     "));
-  }
+    lcd.print(F("РЮМКУ"));
 }
 // Меню налито
 void oled_nalito(int MenuFlag, int Nalito, int Drink) {
@@ -578,10 +567,12 @@ void loop()  {
 //mp3_set_volume (15);// устанавливаем громкость 15 
 //delay (100);
 		  mp3_play (99);  // Проигрываем бодренькую мелодию
-          oled_naliv(MenuFlag, Drink, DrinkCount); // Выводим на экран наливаем ...
           byte drink_count = 0;
+          byte normal_drink_count = 1;
           for (int y = 0; y < max_DrinkCount; y++) {
-            if (analogRead(Optics[y]) < Optics_porog[y] ) {
+            if (analogRead(Optics[y]) > Optics_porog[y] ) {
+              int count = normal_drink_count++;
+              oled_naliv(MenuFlag, Drink, count); // Выводим на экран наливаем ...
               strip.setPixelColor(y, strip.Color(255, 0, 0)); // Подствечиваем красным цветом
               strip.show();
               ServoNaliv(y); // Перемещяемся к рюмке
@@ -668,9 +659,9 @@ void loop()  {
         int val = analogRead(Optics[i]);     // считываем значение
 //        Serial.println(val);
         if (val < Optics_porog[i]) {
-          strip.setPixelColor(i, strip.Color(0, 0, 255));
-        } else {
           strip.setPixelColor(i, strip.Color(0, 0, 0));
+        } else {
+          strip.setPixelColor(i, strip.Color(0, 0, 255));
         }
     //    delay(20);
 
