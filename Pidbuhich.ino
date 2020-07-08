@@ -4,6 +4,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <DFPlayer_Mini_Mp3.h>
 #include <GyverEncoder.h>
+#include <stdlib.h>
+#include <time.h>
 
 LCD_1602_RUS lcd(0x27, 16, 2); //Порт дисплея обычно 0x27 или 0x3F, подключение экрана А4-SDA-зеленый, А5-SCL-желтый
 
@@ -62,30 +64,47 @@ void pump_timer(byte Drink) {
     digitalWrite(PIN_PUMP, 0); //выкл реле
 }
 
-void oled_menu(byte Menu) {
-    lcd.clear();
-    lcd.setCursor(3, 0);
-    lcd.print(F("НАЛИВАТОР+"));
+/**
+ * CLEAR > < arrows
+ */
+void clearMenuArrows() {
+    lcd.setCursor(0, 1);
+    lcd.print(F(""));
+    lcd.setCursor(15, 1);
+    lcd.print(F(""));
+}
+
+void printMenuArrows() {
     lcd.setCursor(0, 1);
     lcd.print(F(">"));
     lcd.setCursor(15, 1);
     lcd.print(F("<"));
+}
+
+void oled_menu(byte Menu) {
+    lcd.clear();
+    lcd.setCursor(3, 0);
+    lcd.print(F("НАЛИВАТОР+"));
     switch (Menu) {
         case 0:
+            printMenuArrows();
             lcd.setCursor(6, 1);
             lcd.print(F("АВТО"));
             break;
         case 1:
+            printMenuArrows();
             lcd.setCursor(2, 1);
             lcd.print(F("РУЧНОЙ РЕЖИМ"));
             break;
         case 2:
+            printMenuArrows();
             lcd.setCursor(4, 1);
             lcd.print(F("ПРОМЫВКА"));
             break;
         case 3:
+            clearMenuArrows();
             lcd.setCursor(1, 1);
-            lcd.print(F("РУССКАЯРУЛЕТКА"));
+            lcd.print(F("РУССКАЯ РУЛЕТКА"));
             break;
     }
 }
@@ -125,8 +144,19 @@ void oled_auto(int Drink) {
     lcd.setCursor(13, 0);
     lcd.print(F("мЛ?"));
     DrinkInfo(57);
-
 }
+
+void oled_russian_roulette(int Drink) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("HАЛИТЬ ПО"));
+    lcd.setCursor(10, 0);
+    lcd.print(Drink);
+    Serial.println(Drink);
+    lcd.setCursor(13, 0);
+    lcd.print(F("мЛ?"));
+    DrinkInfo(57);
+};
 
 // Меню Ручной режим
 void oled_manual(int DrinkCount, int Drink) {
@@ -175,6 +205,24 @@ void oled_naliv(int MenuFlag, int Drink, int DrinkCount) {
     Serial.println(DrinkCount);
     lcd.setCursor(7, 1);
     lcd.print(F("РЮМКУ"));
+}
+
+void oled_random_naliv() {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("НАЛИВАЮ В"));
+    lcd.setCursor(0, 1);
+    lcd.print(F("СЛУЧАЙНУЮ РЮМКУ"));
+}
+
+void oled_random_nalito(int Drink) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("HАЛИТО "));
+    lcd.print(Drink);
+    lcd.print(F(" мЛ В"));
+    lcd.setCursor(0, 1);
+    lcd.print(F("СЛУЧАЙНУЮ РЮМКУ"));
 }
 
 // Меню налито
@@ -537,6 +585,8 @@ void loop() {
                 oled_manual(DrinkCount, Drink);
                 break;
             case 3:
+                (Drink <= min_Drink) ? Drink = max_Drink : Drink--; // Уменьшаем кол-во милилитров в рюмку
+                oled_russian_roulette(Drink);
                 break;
         }
         //Вращение вправо
@@ -556,6 +606,8 @@ void loop() {
                 oled_manual(DrinkCount, Drink);
                 break;
             case 3:
+                (Drink >= max_Drink) ? Drink = min_Drink : Drink++;
+                oled_russian_roulette(Drink);
                 break;
         }
     }
@@ -633,6 +685,57 @@ void loop() {
             Tost();
             CvetoMuzik();
             oled_manual(DrinkCount, Drink);
+        } else if (Menu == 3 && MenuFlag == 0) { //Нажатие русская рулетка
+            MenuFlag = 3;
+            oled_russian_roulette(Drink);
+        } else if (MenuFlag == 3) { //Разлив русская рулетка
+            byte drink_count = 0;
+            /**
+             * Получаем количество стоящих рюмок
+             */
+            for (int y = 0; y < max_DrinkCount; y++) {
+                if (analogRead(Optics[y]) > Optics_porog[y]) {
+                    drink_count++;
+                }
+                mp3_stop;
+            }
+            /**
+             * Запоминаем индекс стоящей стопки
+             */
+            int indexes[drink_count];
+            int currentIndex = -1;
+            for (int y = 0; y < max_DrinkCount; y++) {
+                if (analogRead(Optics[y]) > Optics_porog[y]) {
+                    currentIndex++;
+                    indexes[currentIndex] = y;
+                    Serial.println(indexes[currentIndex]);
+                }
+            }
+            if (drink_count > 0) {
+                int randomIndex = rand() % drink_count + 0; //Получаем случайную координату стопки от 0 до drink_count
+                oled_random_naliv();
+                strip.setPixelColor(indexes[randomIndex], strip.Color(255, 0, 0)); // Подствечиваем красным цветом
+                strip.show();
+                ServoNaliv(indexes[randomIndex]); // Перемещяемся к рюмке
+                pump_timer(Drink); // Налив.
+                strip.setPixelColor(indexes[randomIndex], strip.Color(0, 255, 0)); // Подствечиваем зеленым , налито.
+                strip.show();
+                oled_random_nalito(Drink);
+                ServoParking();
+                delay(1000);
+                Tost();
+                CvetoMuzik();
+                oled_russian_roulette(Drink);
+            } else {
+                lcd.setCursor(0, 0);
+                lcd.print(F("   НЕТ РЮМОК!   "));
+                lcd.setCursor(0, 1);
+                lcd.print(F("ПОСТАВТЕ РЮМКИ! "));
+                mp3_play(61);  // Проигрываем СТУК по люку.
+                delay(2000);
+                oled_russian_roulette(Drink);
+
+            }
         }
     }
 
