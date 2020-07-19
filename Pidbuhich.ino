@@ -5,12 +5,17 @@
 #include <DFPlayer_Mini_Mp3.h>
 #include <GyverEncoder.h>
 #include <stdlib.h>
+#include <iostream.h>
 #include <time.h>
+
+using namespace std;
 
 LCD_1602_RUS lcd(0x27, 16, 2); //Порт дисплея обычно 0x27 или 0x3F, подключение экрана А4-SDA-зеленый, А5-SCL-желтый
 
 unsigned long currentTime;
 unsigned long ledTime;
+
+srand((unsigned int)time(NULL));
 
 
 const byte CLK = 2;
